@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全网影视解析助手</title>
+    <!-- 修改1：替换为DeepSeek小鲸鱼图标 -->
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/DeepSeek-AI/DeepSeek-Icons@main/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 添加hls.js库支持m3u8播放 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.0.10/dist/hls.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        dark: '#1E293B',
+                        iqiyi: '#FE2C55',
+                        youku: '#FFC107',
+                        tencent: '#2E82FF',
+                        mango: '#FF6B00',
+                        quantum: '#6366F1',
+                        hd: '#10B981',
+                        ikun: '#F59E0B',
+                        max: '#EC4899',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .shadow-custom {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+            .bg-gradient-custom {
+                background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            }
+            .platform-card {
+                transition: all 0.3s ease;
+            }
+            .platform-card:hover {
+                transform: translateY(-5px);
+            }
+            .iqiyi-bg {
+                background: linear-gradient(135deg, #FE2C55 0%, #FF5E81 100%);
+            }
+            .youku-bg {
+                background: linear-gradient(135deg, #FFC107 0%, #FFD54F 100%);
+            }
+            .tencent-bg {
+                background: linear-gradient(135deg, #2E82FF 0%, #5DA2FF 100%);
+            }
+            .mango-bg {
+                background: linear-gradient(135deg, #FF6B00 0%, #FF8C38 100%);
+            }
+            .quantum-bg {
+                background: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+            }
+            .hd-bg {
+                background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            }
+            .ikun-bg {
+                background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+            }
+            .max-bg {
+                background: linear-gradient(135deg, #EC4899 0%, #F472B6 100%);
+            }
+            .highlighted-section {
+                animation: highlight 2s ease;
+            }
+            @keyframes highlight {
+                0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+                70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            }
+            /* 新增2：为如意资源添加蓝色渐变背景 */
+            .ruyi-bg {
+                background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            }
+            /* 新增2：为最大资源添加紫色渐变背景 */
+            .maxzy-bg {
+                background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="bg-gradient-custom text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-play-circle-o text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold">全网影视解析助手</h1>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 视频播放区域 -->
+        <section id="playerSection" class="bg-white rounded-xl shadow-custom p-6 mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                    <i class="fa fa-play-circle text-primary mr-2"></i>视频播放器
+                </h2>
+                <div class="text-sm text-gray-600">
+                    <span id="adblockStatus">广告拦截: <span class="text-green-600 font-medium">已启用</span></span>
+                </div>
+            </div>
+            <div class="aspect-video bg-gray-900 rounded-lg overflow-hidden relative shadow-inner">
+                <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 z-10 hidden">
+                    <div class="flex flex-col items-center">
+                        <div class="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
+                        <p class="text-white text-sm">视频加载中，请稍候...</p>
+                    </div>
+                </div>
+                <div id="playerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-white">
+                    <i class="fa fa-play-circle text-6xl text-primary/30 mb-4"></i>
+                    <p class="text-xl font-medium">视频播放器</p>
+                    <p class="text-gray-400 mt-2">输入视频地址并点击播放按钮开始观看</p>
+                </div>
+                <iframe id="videoPlayer" src="" frameborder="0" allowfullscreen class="w-full h-full hidden"></iframe>
+                <!-- 新增m3u8播放器 -->
+                <video id="m3u8Player" controls class="w-full h-full hidden"></video>
+            </div>
+            <div class="mt-4 flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    <span id="currentApi">当前使用：默认线路</span>
+                </div>
+                <div>
+                    <button id="fullscreenBtn" class="text-primary hover:text-primary/80 transition-colors flex items-center">
+                        <i class="fa fa-expand mr-1"></i>
+                        <span>全屏播放</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 视频解析区域 -->
+        <section id="parserSection" class="bg-white rounded-xl shadow-custom p-6 mb-8 transform transition-all duration-300 hover:shadow-lg">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fa fa-link text-primary mr-2"></i>视频解析
+            </h2>
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-grow relative">
+                    <input type="text" id="videoUrl" placeholder="请输入视频地址（支持优酷、爱奇艺、腾讯视频等）" 
+                           class="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300">
+                    <button id="clearInput" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <button id="playBtn" class="bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center">
+                    <i class="fa fa-play mr-2"></i>播放视频
+                </button>
+            </div>
+            
+            <!-- 平台快捷跳转 -->
+            <div class="mt-6">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">热门视频平台</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <a href="https://www.iqiyi.com" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md iqiyi-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-film text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">爱奇艺</div>
+                                <div class="text-xs opacity-80">海量独播内容</div>
+                            </div>
+                        </div>
+                    </a>
+                    <a href="https://v.qq.com" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md tencent-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-television text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">腾讯视频</div>
+                                <div class="text-xs opacity-80">热门剧集综艺</div>
+                            </div>
+                        </div>
+                    </a>
+                    <a href="https://www.youku.com" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md youku-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-youtube-play text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">优酷</div>
+                                <div class="text-xs opacity-80">精彩视频尽在</div>
+                            </div>
+                        </div>
+                    </a>
+                    <a href="https://www.mgtv.com" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md mango-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-music text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">芒果TV</div>
+                                <div class="text-xs opacity-80">综艺娱乐首选</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 视频采集平台 -->
+            <div class="mt-6">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">视频采集平台</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- 修改1：量子资源改为天堂资源 -->
+                    <a href="http://dyttzy1.tv" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md quantum-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-atom text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">天堂资源</div>
+                                <div class="text-xs opacity-80">影视资源大全</div>
+                            </div>
+                        </div>
+                    </a>
+                    <a href="https://1080zyk6.com" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md hd-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-hd-video text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">高清资源</div>
+                                <div class="text-xs opacity-80">高清影视资源</div>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- 修改2：ikun资源改为如意资源 -->
+                    <!-- 修改3：如意资源卡片使用新背景色 -->
+                    <a href="https://ryzy7.tv/" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md ruyi-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-crown text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">如意资源</div>
+                                <div class="text-xs opacity-80">海量影视资源</div>
+                            </div>
+                        </div>
+                    </a>
+                    <!-- 修改3：最大资源卡片使用新背景色 -->
+                    <a href="https://zuidazy.me" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md maxzy-bg text-white">
+                        <div class="p-4 flex items-center">
+                            <i class="fa fa-infinity text-3xl mr-3"></i>
+                            <div>
+                                <div class="font-bold">最大资源</div>
+                                <div class="text-xs opacity-80">影视资源大全</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 接口选择 -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">选择解析接口：</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="interface-option relative">
+                        <input type="radio" id="api1" name="api" value="https://jx.xmflv.com/?url=" class="peer sr-only" checked>
+                        <label for="api1" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">默认线路</span>
+                            <span class="text-xs text-gray-500 ml-2">推荐·稳定</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api2" name="api" value="https://www.8090g.cn/jiexi/?url=" class="peer sr-only">
+                        <label for="api2" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路一</span>
+                            <span class="text-xs text-gray-500 ml-2">多格式支持</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api3" name="api" value="https://z1.m1907.top/?jx=" class="peer sr-only">
+                        <label for="api3" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路二</span>
+                            <span class="text-xs text-gray-500 ml-2">推荐·快速</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api4" name="api" value="https://www.ckplayer.vip/jiexi/?url=" class="peer sr-only">
+                        <label for="api4" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路三</span>
+                            <span class="text-xs text-gray-500 ml-2">通用·兼容</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="interface-option relative">
+                        <input type="radio" id="api5" name="api" value="https://www.playm3u8.cn/jiexi.php?url=" class="peer sr-only">
+                        <label for="api5" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路四</span>
+                            <span class="text-xs text-gray-500 ml-2">流畅·稳定</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api6" name="api" value="http://111.6.188.162/bbqq.php?url=" class="peer sr-only">
+                        <label for="api6" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路五</span>
+                            <span class="text-xs text-gray-500 ml-2">备用线路</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api7" name="api" value="https://jx.hls.one/?url=" class="peer sr-only">
+                        <label for="api7" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路六</span>
+                            <span class="text-xs text-gray-500 ml-2">高速线路</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api8" name="api" value="https://www.yemu.xyz/?url=" class="peer sr-only">
+                        <label for="api8" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路七</span>
+                            <span class="text-xs text-gray-500 ml-2">多平台支持</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api9" name="api" value="https://jx.playerjy.com/?url=" class="peer sr-only">
+                        <label for="api9" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路八</span>
+                            <span class="text-xs text-gray-500 ml-2">经典线路</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api10" name="api" value="https://jx.m3u8.tv/jiexi/?url=" class="peer sr-only">
+                        <label for="api10" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路九</span>
+                            <span class="text-xs text-gray-500 ml-2">高清解析</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api11" name="api" value="http://14.103.112.79:188/so.php?wd=" class="peer sr-only">
+                        <label for="api11" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">线路十</span>
+                            <span class="text-xs text-gray-500 ml-2">搜索影片名</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                    <div class="interface-option relative">
+                        <input type="radio" id="api12" name="api" value="m3u8" class="peer sr-only">
+                        <label for="api12" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                            <span class="font-medium">点播线路</span>
+                            <span class="text-xs text-gray-500 ml-2">m3u8点播</span>
+                        </label>
+                        <div class="absolute top-2 right-2 text-primary opacity-0 peer-checked:opacity-100 transition-opacity">
+                            <i class="fa fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm text-gray-400">© 2025 全网影视解析助手 | 保留所有权利</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const videoUrl = document.getElementById('videoUrl');
+            const playBtn = document.getElementById('playBtn');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const m3u8Player = document.getElementById('m3u8Player');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const currentApi = document.getElementById('currentApi');
+            const clearInput = document.getElementById('clearInput');
+            const playerPlaceholder = document.getElementById('playerPlaceholder');
+            const adblockStatus = document.getElementById('adblockStatus');
+            
+            // 全局HLS播放器实例
+            let hls = null;
+            
+            // 清除输入框内容
+            clearInput.addEventListener('click', function() {
+                videoUrl.value = '';
+                videoUrl.focus();
+            });
+            
+            // 平台链接点击事件
+            const platformLinks = document.querySelectorAll('.platform-card');
+            platformLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // 只保留跳转功能
+                });
+            });
+            
+            // M3U8广告拦截功能
+            function setupAdBlock() {
+                // 广告拦截规则
+                const adRules = [
+                    'ad.', 'ads.', 'adserver', 'doubleclick', 'advertising.com',
+                    'gf.qytechs.cn', 'ad-cdn', 'advert', 'adimg', 'adcontent',
+                    'adservice', 'adx', 'adn', 'admaster', 'adpush', 'adclick',
+                    'advertiser', 'advertise', 'advert', 'adver', 'advertise'
+                ];
+                
+                // 拦截广告片段
+                if (hls && hls.on) {
+                    hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                        const frag = data.frag;
+                        const url = frag.url.toLowerCase();
+                        
+                        // 检查是否是广告片段
+                        const isAd = adRules.some(rule => url.includes(rule)) || 
+                                    frag.duration < 10 || // 短片段可能是广告
+                                    frag.title?.toLowerCase().includes('ad');
+                        
+                        if (isAd) {
+                            console.log('[广告拦截] 检测到广告片段:', frag.url);
+                            
+                            // 计算广告结束时间
+                            const adEndTime = frag.start + frag.duration;
+                            
+                            // 如果当前播放时间在广告时间段内，则跳过广告
+                            if (m3u8Player.currentTime >= frag.start && 
+                                m3u8Player.currentTime < adEndTime) {
+                                m3u8Player.currentTime = adEndTime;
+                                console.log(`[广告拦截] 跳过广告片段: ${frag.start}s - ${adEndTime}s`);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // 播放按钮点击事件
+            playBtn.addEventListener('click', function() {
+                const url = videoUrl.value.trim();
+                if (!url) {
+                    alert('请输入视频地址');
+                    videoUrl.focus();
+                    return;
+                }
+                
+                // 获取选中的解析接口
+                const selectedApi = document.querySelector('input[name="api"]:checked');
+                if (!selectedApi) {
+                    alert('请选择解析接口');
+                    return;
+                }
+                
+                // 更新当前使用的接口信息
+                const apiNames = {
+                    'api1': '默认线路', 'api2': '线路一', 'api3': '线路二', 'api4': '线路三',
+                    'api5': '线路四', 'api6': '线路五', 'api7': '线路六', 'api8': '线路七',
+                    'api9': '线路八', 'api10': '线路九', 'api11': '线路十', 'api12': '点播线路'
+                };
+                currentApi.textContent = `当前使用：${apiNames[selectedApi.id]}`;
+                
+                // 显示加载指示器
+                playerPlaceholder.classList.add('hidden');
+                videoPlayer.classList.add('hidden');
+                m3u8Player.classList.add('hidden');
+                loadingIndicator.classList.remove('hidden');
+                
+                // 特殊处理点播线路（m3u8）
+                if (selectedApi.id === 'api12') {
+                    // 显示m3u8播放器
+                    setTimeout(() => {
+                        try {
+                            // 清除之前的HLS实例
+                            if (hls) {
+                                hls.destroy();
+                                hls = null;
+                            }
+                            
+                            // 重置播放器
+                            m3u8Player.pause();
+                            m3u8Player.removeAttribute('src');
+                            m3u8Player.load();
+                            
+                            // 使用HLS.js播放m3u8
+                            if (Hls.isSupported()) {
+                                hls = new Hls({
+                                    debug: false,
+                                    enableWorker: true,
+                                    lowLatencyMode: true,
+                                    backBufferLength: 90
+                                });
+                                
+                                hls.loadSource(url);
+                                hls.attachMedia(m3u8Player);
+                                
+                                // 设置广告拦截
+                                setupAdBlock();
+                                
+                                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                                    loadingIndicator.classList.add('hidden');
+                                    m3u8Player.classList.remove('hidden');
+                                    m3u8Player.play();
+                                });
+                                
+                                hls.on(Hls.Events.ERROR, function(event, data) {
+                                    console.error('HLS Error:', data);
+                                    if (data.fatal) {
+                                        switch(data.type) {
+                                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                                // 尝试重新加载
+                                                hls.startLoad();
+                                                break;
+                                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                                hls.recoverMediaError();
+                                                break;
+                                            default:
+                                                // 无法恢复
+                                                loadingIndicator.classList.add('hidden');
+                                                alert('播放m3u8时出错，请检查链接');
+                                                break;
+                                        }
+                                    }
+                                });
+                            } else if (m3u8Player.canPlayType('application/vnd.apple.mpegurl')) {
+                                // 对于原生支持HLS的浏览器（如Safari）
+                                m3u8Player.src = url;
+                                m3u8Player.addEventListener('loadedmetadata', function() {
+                                    loadingIndicator.classList.add('hidden');
+                                    m3u8Player.classList.remove('hidden');
+                                    m3u8Player.play();
+                                });
+                                m3u8Player.onerror = function() {
+                                    loadingIndicator.classList.add('hidden');
+                                    alert('无法播放该m3u8文件，请检查链接是否正确');
+                                };
+                            } else {
+                                loadingIndicator.classList.add('hidden');
+                                alert('您的浏览器不支持播放m3u8视频');
+                            }
+                        } catch (error) {
+                            console.error('播放m3u8出错:', error);
+                            loadingIndicator.classList.add('hidden');
+                            alert('播放m3u8时出错: ' + error.message);
+                        }
+                    }, 500);
+                } else {
+                    // 构建解析URL
+                    const parseUrl = selectedApi.value + encodeURIComponent(url);
+                    
+                    // 设置iframe源并显示视频
+                    setTimeout(() => {
+                        try {
+                            videoPlayer.src = parseUrl;
+                            videoPlayer.onload = function() {
+                                loadingIndicator.classList.add('hidden');
+                                videoPlayer.classList.remove('hidden');
+                            };
+                            videoPlayer.onerror = function() {
+                                loadingIndicator.classList.add('hidden');
+                                alert('视频加载失败，请尝试其他线路');
+                            };
+                        } catch (error) {
+                            console.error('播放视频出错:', error);
+                            loadingIndicator.classList.add('hidden');
+                            alert('播放视频时出错: ' + error.message);
+                        }
+                    }, 500);
+                }
+            });
+            
+            // 全屏按钮点击事件
+            fullscreenBtn.addEventListener('click', function() {
+                let targetElement;
+                
+                if (!videoPlayer.classList.contains('hidden')) {
+                    targetElement = videoPlayer;
+                } else if (!m3u8Player.classList.contains('hidden')) {
+                    targetElement = m3u8Player;
+                } else {
+                    return;
+                }
+                
+                if (targetElement.requestFullscreen) {
+                    targetElement.requestFullscreen();
+                } else if (targetElement.webkitRequestFullscreen) {
+                    targetElement.webkitRequestFullscreen();
+                } else if (targetElement.msRequestFullscreen) {
+                    targetElement.msRequestFullscreen();
+                }
+            });
+            
+            // 输入框回车事件
+            videoUrl.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    playBtn.click();
+                }
+            });
+            
+            // 当选择点播线路时，更改输入框提示
+            const apiRadios = document.querySelectorAll('input[name="api"]');
+            apiRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.id === 'api12') {
+                        videoUrl.placeholder = '请输入m3u8视频链接';
+                    } else {
+                        videoUrl.placeholder = '请输入视频地址（支持优酷、爱奇艺、腾讯视频等）';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
