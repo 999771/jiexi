@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全网影视解析助手</title>
-    <link rel="icon" href="https://touduyu.oss-cn-beijing.aliyuncs.com/site/1/deepseek.png" type="image/x-icon">
+    <link rel="icon" href="https://cdn.deepseek.com/chat/icon.png" type="image/x-icon">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- 添加hls.js库支持m3u8播放 -->
@@ -85,11 +85,9 @@
                 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
                 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
             }
-            /* 新增2：为如意资源添加蓝色渐变背景 */
             .ruyi-bg {
                 background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
             }
-            /* 新增2：为最大资源添加紫色渐变背景 */
             .maxzy-bg {
                 background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
             }
@@ -132,7 +130,6 @@
                     <p class="text-gray-400 mt-2">输入视频地址并点击播放按钮开始观看</p>
                 </div>
                 <iframe id="videoPlayer" src="" frameborder="0" allowfullscreen class="w-full h-full hidden"></iframe>
-                <!-- 新增m3u8播放器 -->
                 <video id="m3u8Player" controls class="w-full h-full hidden"></video>
             </div>
             <div class="mt-4 flex justify-between items-center">
@@ -213,7 +210,6 @@
             <div class="mt-6">
                 <h3 class="text-lg font-medium text-gray-800 mb-3">视频采集平台</h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <!-- 修改1：量子资源改为天堂资源 -->
                     <a href="http://dyttzy1.tv" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md quantum-bg text-white">
                         <div class="p-4 flex items-center">
                             <i class="fa fa-atom text-3xl mr-3"></i>
@@ -232,8 +228,6 @@
                             </div>
                         </div>
                     </a>
-                    <!-- 修改2：ikun资源改为如意资源 -->
-                    <!-- 修改3：如意资源卡片使用新背景色 -->
                     <a href="https://ryzy7.tv/" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md ruyi-bg text-white">
                         <div class="p-4 flex items-center">
                             <i class="fa fa-crown text-3xl mr-3"></i>
@@ -243,7 +237,6 @@
                             </div>
                         </div>
                     </a>
-                    <!-- 修改3：最大资源卡片使用新背景色 -->
                     <a href="https://zuidazy.me" target="_blank" class="platform-card rounded-lg overflow-hidden shadow-md maxzy-bg text-white">
                         <div class="p-4 flex items-center">
                             <i class="fa fa-infinity text-3xl mr-3"></i>
@@ -638,16 +631,19 @@
             function checkUrlParams() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const urlParam = urlParams.get('url');
+                const autoParam = urlParams.get('auto');
                 
                 if (urlParam) {
                     // 解码URL参数并填充到输入框
                     const decodedUrl = decodeURIComponent(urlParam);
                     videoUrl.value = decodedUrl;
                     
-                    // 自动触发播放
-                    setTimeout(() => {
-                        playBtn.click();
-                    }, 500);
+                    // 如果存在auto参数且值为true/1/yes，则自动播放
+                    if (autoParam && ['true', '1', 'yes'].includes(autoParam.toLowerCase())) {
+                        setTimeout(() => {
+                            playBtn.click();
+                        }, 500);
+                    }
                 }
             }
             
