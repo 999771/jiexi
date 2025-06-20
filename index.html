@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全网影视解析助手</title>
-    <link rel="icon" href="https://touduyu.oss-cn-beijing.aliyuncs.com/site/1/deepseek.png" type="image/x-icon">
+    <link rel="icon" href="https://cdn.deepseek.com/chat/icon.png" type="image/x-icon">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- 添加hls.js库支持m3u8播放 -->
@@ -633,6 +633,26 @@
                     }
                 });
             });
+
+            // 检查URL参数并自动填充和播放
+            function checkUrlParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlParam = urlParams.get('url');
+                
+                if (urlParam) {
+                    // 解码URL参数并填充到输入框
+                    const decodedUrl = decodeURIComponent(urlParam);
+                    videoUrl.value = decodedUrl;
+                    
+                    // 自动触发播放
+                    setTimeout(() => {
+                        playBtn.click();
+                    }, 500);
+                }
+            }
+            
+            // 页面加载完成后检查URL参数
+            checkUrlParams();
         });
     </script>
 </body>
