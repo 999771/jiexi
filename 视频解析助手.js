@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         视频解析助手（带自动播放）
+// @name         视频解析助手
 // @namespace    http://tampermonkey.net/
 // @version      17.0
 // @description 点击解析自动跳转并播放
@@ -55,12 +55,12 @@
     // 生成带自动播放参数的URL
     function generateAutoPlayUrl() {
         const currentUrl = encodeURIComponent(window.location.href);
-        // 确保URL中只包含一个autoplay参数
+        // 确保URL中只包含一个auto参数
         let baseUrl = 'https://jx.mmxia.site/?url=';
-        if (currentUrl.includes('autoplay=')) {
-            return currentUrl.replace(/autoplay=[^&]*/, 'autoplay=true');
+        if (currentUrl.includes('auto=')) {
+            return currentUrl.replace(/auto=[^&]*/, 'auto=true');
         }
-        return `${baseUrl}${currentUrl}&autoplay=true`;
+        return `${baseUrl}${currentUrl}&auto=true`;
     }
 
     // 创建解析按钮
