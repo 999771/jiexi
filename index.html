@@ -113,9 +113,7 @@
                 <h2 class="text-xl font-bold text-gray-800 flex items-center">
                     <i class="fa fa-play-circle text-primary mr-2"></i>视频播放器
                 </h2>
-                <div class="text-sm text-gray-600">
-                    <span id="adblockStatus">广告拦截: <span class="text-green-600 font-medium">已启用</span></span>
-                </div>
+                <!-- 已删除广告拦截状态显示 -->
             </div>
             <div class="aspect-video bg-gray-900 rounded-lg overflow-hidden relative shadow-inner">
                 <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 z-10 hidden">
@@ -387,6 +385,207 @@
     </footer>
 
     <script>
+        // ================= 广告拦截核心代码 =================
+        // 增强的广告关键词列表
+        const adKeywords = [
+            'ad.', 'ads.', 'ad\\', 'ad/', 'ad-', 'ad_', 'doubleclick', 'adserver', 
+            'advert', 'advertising', 'adcontent', 'adimage', 'preroll', 'midroll', 
+            'postroll', 'ad_cdn', 'adg', 'adx', 'adsys', 'adserv', 'adsystem', 
+            'advertise', 'advertisement', 'advertiser', 'advertising', 'advertize', 
+            'advertizing', 'adwrapper', 'bannerad', 'basead', 'adworld', 'adzone', 
+            'billboardad', 'clickad', 'commercial', 'dynamicad', 'googlead', 'iad', 
+            'inlinead', 'pagead', 'popupad', 'sponsor', 'sponsored', 'sponsoredad', 
+            'sponsoredlink', 'sponsoredlinks', 'sponsoredresult', 'sponsoredresults', 
+            'textad', 'trackingad', 'video_ad', 'videoad', 'adsegment', 'adbreak',
+            'adinsert', 'adtag', 'adprovider', 'adtech', 'adnetwork', 'admanager',
+            'adroll', 'advertorial', 'promo', 'commercial', 'bumper', 'overlayad',
+            'companionad', 'adrequest', 'adresponse', 'adtiming', 'admetric', 'adlog'
+        ];
+
+        // 增强的图片广告扩展名
+        const imageExtensions = ['.jpg', '.png', '.jpeg', '.gif', '.webp', '.bmp'];
+
+        // 核心广告过滤函数
+        function filterM3U8Content(content) {
+            if (!content) return content;
+            
+            try {
+                const lines = content.split('\n');
+                let result = [];
+                let inAdBlock = false;
+                let adBlockLines = [];
+                let segmentCount = 0;
+                let totalDuration = 0;
+                let hasAdKeyword = false;
+                let hasAdImage = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // 检查是否包含广告关键词
+                    if (line.match(/\.(ts|jpg|png|jpeg|gif|webp|bmp)$/i)) {
+                        const url = line.toLowerCase();
+                        const isImage = imageExtensions.some(ext => url.includes(ext));
+                        
+                        if (isImage) {
+                            hasAdImage = true;
+                        }
+                        
+                        if (adKeywords.some(kw => url.includes(kw))) {
+                            hasAdKeyword = true;
+                        }
+                    }
+
+                    // 检测广告块开始
+                    if (line.startsWith('#EXT-X-DISCONTINUITY') || 
+                        line.includes('#EXT-X-CUE-OUT') || 
+                        line.includes('#EXT-OATCLS-SCTE35')) {
+                        if (!inAdBlock) {
+                            inAdBlock = true;
+                            adBlockLines = [line];
+                            segmentCount = 0;
+                            totalDuration = 0;
+                            hasAdKeyword = false;
+                            hasAdImage = false;
+                        } else {
+                            adBlockLines.push(line);
+                        }
+                        continue;
+                    }
+
+                    // 处理广告块中的EXTINF行
+                    if (inAdBlock && line.startsWith('#EXTINF')) {
+                        adBlockLines.push(line);
+                        const durationMatch = line.match(/#EXTINF:([\d.]+),/);
+                        if (durationMatch) {
+                            totalDuration += parseFloat(durationMatch[1]);
+                        }
+                        continue;
+                    }
+
+                    // 处理广告块中的媒体行
+                    if (inAdBlock && line.match(/\.(ts|jpg|png|jpeg|gif|webp|bmp)$/i)) {
+                        adBlockLines.push(line);
+                        segmentCount++;
+                        continue;
+                    }
+
+                    // 广告块结束处理
+                    if (inAdBlock) {
+                        // 增强的广告检测条件
+                        const isAd = (totalDuration < 45 && segmentCount < 6) || 
+                                    hasAdKeyword || 
+                                    hasAdImage || 
+                                    (totalDuration > 0 && segmentCount === 0); // 只有标记没有片段
+                        
+                        if (!isAd) {
+                            result = result.concat(adBlockLines);
+                        } else {
+                            console.log(`[广告拦截] 移除广告块: ${segmentCount}个片段, 总时长${totalDuration}秒`);
+                        }
+                        
+                        inAdBlock = false;
+                        adBlockLines = [];
+                    }
+
+                    // 添加普通行
+                    result.push(lines[i]);
+                }
+
+                // 处理文件末尾的广告块
+                if (inAdBlock) {
+                    const isAd = (totalDuration < 45 && segmentCount < 6) || 
+                                hasAdKeyword || 
+                                hasAdImage;
+                    if (!isAd) {
+                        result = result.concat(adBlockLines);
+                    }
+                }
+
+                // 确保以#EXT-X-ENDLIST结束
+                if (result.length > 0 && !result[result.length - 1].includes('#EXT-X-ENDLIST')) {
+                    result.push('#EXT-X-ENDLIST');
+                }
+
+                return result.join('\n');
+            } catch (e) {
+                console.error('处理m3u8时出错:', e);
+                return content;
+            }
+        }
+
+        // 增强的HLS播放器封装
+        function setupAdFreeHlsPlayer(videoElement, url) {
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    debug: false,
+                    enableWorker: true,
+                    backBufferLength: 90
+                });
+
+                // 拦截并处理m3u8清单
+                hls.on(Hls.Events.MANIFEST_LOADING, (event, data) => {
+                    const originalLoader = hls.loader;
+                    
+                    hls.loader = {
+                        load: function(context, config, callbacks) {
+                            if (context.type === 'manifest') {
+                                // 自定义加载器处理m3u8内容
+                                const onSuccess = callbacks.onSuccess;
+                                
+                                callbacks.onSuccess = (response, stats, context) => {
+                                    try {
+                                        const filteredContent = filterM3U8Content(response.data);
+                                        response.data = filteredContent;
+                                        onSuccess(response, stats, context);
+                                    } catch (e) {
+                                        console.error('处理m3u8失败:', e);
+                                        onSuccess(response, stats, context);
+                                    }
+                                };
+                            }
+                            originalLoader.load(context, config, callbacks);
+                        },
+                        abort: function() { originalLoader.abort(); },
+                        destroy: function() { originalLoader.destroy(); }
+                    };
+                });
+
+                // 加载视频源
+                hls.loadSource(url);
+                hls.attachMedia(videoElement);
+                
+                // 错误处理
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.error('网络错误，尝试重新加载');
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.error('媒体错误，尝试恢复');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                console.error('无法恢复的错误');
+                                break;
+                        }
+                    }
+                });
+                
+                return hls;
+            } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari原生支持
+                videoElement.src = url;
+                return null;
+            } else {
+                console.error('HLS不受支持');
+                return null;
+            }
+        }
+        // ================= 广告拦截核心代码结束 =================
+
         document.addEventListener('DOMContentLoaded', function() {
             const videoUrl = document.getElementById('videoUrl');
             const playBtn = document.getElementById('playBtn');
@@ -397,7 +596,6 @@
             const currentApi = document.getElementById('currentApi');
             const clearInput = document.getElementById('clearInput');
             const playerPlaceholder = document.getElementById('playerPlaceholder');
-            const adblockStatus = document.getElementById('adblockStatus');
             
             // 全局HLS播放器实例
             let hls = null;
@@ -415,44 +613,6 @@
                     // 只保留跳转功能
                 });
             });
-            
-            // M3U8广告拦截功能
-            function setupAdBlock() {
-                // 广告拦截规则
-                const adRules = [
-                    'ad.', 'ads.', 'adserver', 'doubleclick', 'advertising.com',
-                    'gf.qytechs.cn', 'ad-cdn', 'advert', 'adimg', 'adcontent',
-                    'adservice', 'adx', 'adn', 'admaster', 'adpush', 'adclick',
-                    'advertiser', 'advertise', 'advert', 'adver', 'advertise'
-                ];
-                
-                // 拦截广告片段
-                if (hls && hls.on) {
-                    hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
-                        const frag = data.frag;
-                        const url = frag.url.toLowerCase();
-                        
-                        // 检查是否是广告片段
-                        const isAd = adRules.some(rule => url.includes(rule)) || 
-                                    frag.duration < 10 || // 短片段可能是广告
-                                    frag.title?.toLowerCase().includes('ad');
-                        
-                        if (isAd) {
-                            console.log('[广告拦截] 检测到广告片段:', frag.url);
-                            
-                            // 计算广告结束时间
-                            const adEndTime = frag.start + frag.duration;
-                            
-                            // 如果当前播放时间在广告时间段内，则跳过广告
-                            if (m3u8Player.currentTime >= frag.start && 
-                                m3u8Player.currentTime < adEndTime) {
-                                m3u8Player.currentTime = adEndTime;
-                                console.log(`[广告拦截] 跳过广告片段: ${frag.start}s - ${adEndTime}s`);
-                            }
-                        }
-                    });
-                }
-            }
             
             // 播放按钮点击事件
             playBtn.addEventListener('click', function() {
@@ -500,45 +660,14 @@
                             m3u8Player.removeAttribute('src');
                             m3u8Player.load();
                             
-                            // 使用HLS.js播放m3u8
-                            if (Hls.isSupported()) {
-                                hls = new Hls({
-                                    debug: false,
-                                    enableWorker: true,
-                                    lowLatencyMode: true,
-                                    backBufferLength: 90
-                                });
-                                
-                                hls.loadSource(url);
-                                hls.attachMedia(m3u8Player);
-                                
-                                // 设置广告拦截
-                                setupAdBlock();
-                                
+                            // 使用带广告拦截的HLS播放器
+                            hls = setupAdFreeHlsPlayer(m3u8Player, url);
+
+                            if (hls) {
                                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
                                     loadingIndicator.classList.add('hidden');
                                     m3u8Player.classList.remove('hidden');
                                     m3u8Player.play();
-                                });
-                                
-                                hls.on(Hls.Events.ERROR, function(event, data) {
-                                    console.error('HLS Error:', data);
-                                    if (data.fatal) {
-                                        switch(data.type) {
-                                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                                // 尝试重新加载
-                                                hls.startLoad();
-                                                break;
-                                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                                hls.recoverMediaError();
-                                                break;
-                                            default:
-                                                // 无法恢复
-                                                loadingIndicator.classList.add('hidden');
-                                                alert('播放m3u8时出错，请检查链接');
-                                                break;
-                                        }
-                                    }
                                 });
                             } else if (m3u8Player.canPlayType('application/vnd.apple.mpegurl')) {
                                 // 对于原生支持HLS的浏览器（如Safari）
