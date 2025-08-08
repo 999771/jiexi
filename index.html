@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全网影视解析助手</title>
-    <link rel="icon" href="https://cdn.deepseek.com/chat/icon.png" type="image/x-icon">
+    <!-- 更换为自定义SVG图标 -->
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiB2aWV3Qm94PSIwIDAgNDggNDgiPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xMiAzOWgyNCIvPjxyZWN0IHdpZHRoPSIzOSIgaGVpZ2h0PSIyNiIgeD0iNC41IiB5PSI5IiByeD0iMiIgcnk9IjIiLz48L2c+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY3VycmVudENvbG9yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGQ9Ik0yOS44NiAyMmwtOS43Mi01LjU5NnYxMS4xOTJ6Ii8+PC9zdmc+" type="image/svg+xml">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <!-- 添加hls.js库支持m3u8播放 -->
@@ -91,12 +92,31 @@
             .maxzy-bg {
                 background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
             }
+            .player-highlight {
+                animation: playerHighlight 0.5s ease-out;
+            }
+            @keyframes playerHighlight {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.02); }
+                100% { transform: scale(1); }
+            }
+            .buffer-indicator {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                z-index: 5;
+            }
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- 导航栏 -->
-    <header class="bg-gradient-custom text-white shadow-lg sticky top-0 z-50">
+    <header id="mainHeader" class="bg-gradient-custom text-white shadow-lg fixed top-0 left-0 right-0 z-50 transition-all duration-300 transform -translate-y-full">
         <div class="container mx-auto px-4 py-4 flex justify-between items-center">
             <div class="flex items-center space-x-2">
                 <i class="fa fa-play-circle-o text-2xl"></i>
@@ -106,14 +126,13 @@
     </header>
 
     <!-- 主要内容 -->
-    <main class="flex-grow container mx-auto px-4 py-8">
+    <main class="flex-grow container mx-auto px-4 py-8 pt-24"> <!-- 增加顶部内边距避免内容被隐藏 -->
         <!-- 视频播放区域 -->
-        <section id="playerSection" class="bg-white rounded-xl shadow-custom p-6 mb-8">
+        <section id="playerSection" class="bg-white rounded-xl shadow-custom p-6 mb-8 transition-all duration-300">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-gray-800 flex items-center">
                     <i class="fa fa-play-circle text-primary mr-2"></i>视频播放器
                 </h2>
-                <!-- 已删除广告拦截状态显示 -->
             </div>
             <div class="aspect-video bg-gray-900 rounded-lg overflow-hidden relative shadow-inner">
                 <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-gray-900 z-10 hidden">
@@ -122,24 +141,20 @@
                         <p class="text-white text-sm">视频加载中，请稍候...</p>
                     </div>
                 </div>
+                <div id="bufferIndicator" class="buffer-indicator hidden">缓冲中: 0%</div>
                 <div id="playerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-white">
                     <i class="fa fa-play-circle text-6xl text-primary/30 mb-4"></i>
                     <p class="text-xl font-medium">视频播放器</p>
                     <p class="text-gray-400 mt-2">输入视频地址并点击播放按钮开始观看</p>
                 </div>
                 <iframe id="videoPlayer" src="" frameborder="0" allowfullscreen class="w-full h-full hidden"></iframe>
-                <video id="m3u8Player" controls class="w-full h-full hidden"></video>
+                <video id="m3u8Player" controls preload="auto" class="w-full h-full hidden"></video>
             </div>
             <div class="mt-4 flex justify-between items-center">
                 <div class="text-sm text-gray-600">
                     <span id="currentApi">当前使用：默认线路</span>
                 </div>
-                <div>
-                    <button id="fullscreenBtn" class="text-primary hover:text-primary/80 transition-colors flex items-center">
-                        <i class="fa fa-expand mr-1"></i>
-                        <span>全屏播放</span>
-                    </button>
-                </div>
+                <!-- 已删除全屏播放按钮 -->
             </div>
         </section>
 
@@ -150,8 +165,7 @@
             </h2>
             <div class="flex flex-col md:flex-row gap-4">
                 <div class="flex-grow relative">
-                    <input type="text" id="videoUrl" placeholder="请输入视频地址（支持优酷、爱奇艺、腾讯视频等）" 
-                           class="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300">
+                    <input type="text" id="videoUrl" placeholder="请输入视频地址（支持优酷、爱奇艺、腾讯视频等）" class="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-300">
                     <button id="clearInput" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                         <i class="fa fa-times"></i>
                     </button>
@@ -160,7 +174,7 @@
                     <i class="fa fa-play mr-2"></i>播放视频
                 </button>
             </div>
-            
+
             <!-- 平台快捷跳转 -->
             <div class="mt-6">
                 <h3 class="text-lg font-medium text-gray-800 mb-3">热门视频平台</h3>
@@ -203,7 +217,7 @@
                     </a>
                 </div>
             </div>
-            
+
             <!-- 视频采集平台 -->
             <div class="mt-6">
                 <h3 class="text-lg font-medium text-gray-800 mb-3">视频采集平台</h3>
@@ -246,13 +260,13 @@
                     </a>
                 </div>
             </div>
-            
-            <!-- 接口选择 -->
+
+            <!-- 接口选择 - 已调换默认线路和线路三的网址 -->
             <div class="mt-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">选择解析接口：</label>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div class="interface-option relative">
-                        <input type="radio" id="api1" name="api" value="https://jx.xmflv.com/?url=" class="peer sr-only" checked>
+                        <input type="radio" id="api1" name="api" value="https://jx.playerjy.com/?url=" class="peer sr-only" checked>
                         <label for="api1" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
                             <span class="font-medium">默认线路</span>
                             <span class="text-xs text-gray-500 ml-2">推荐·稳定</span>
@@ -272,7 +286,7 @@
                         </div>
                     </div>
                     <div class="interface-option relative">
-                        <input type="radio" id="api3" name="api" value="https://z1.m1907.top/?jx=" class="peer sr-only">
+                        <input type="radio" id="api3" name="api" value="https://jx.xmflv.com/?url=" class="peer sr-only">
                         <label for="api3" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
                             <span class="font-medium">线路二</span>
                             <span class="text-xs text-gray-500 ml-2">推荐·快速</span>
@@ -282,7 +296,7 @@
                         </div>
                     </div>
                     <div class="interface-option relative">
-                        <input type="radio" id="api4" name="api" value="https://jx.playerjy.com/?url=" class="peer sr-only">
+                        <input type="radio" id="api4" name="api" value="https://z1.m1907.top/?jx=" class="peer sr-only">
                         <label for="api4" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
                             <span class="font-medium">线路三</span>
                             <span class="text-xs text-gray-500 ml-2">通用·兼容</span>
@@ -291,7 +305,6 @@
                             <i class="fa fa-check-circle"></i>
                         </div>
                     </div>
-                    
                     <div class="interface-option relative">
                         <input type="radio" id="api5" name="api" value="https://jx.nnxv.cn/tv.php?url=" class="peer sr-only">
                         <label for="api5" class="block p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
@@ -385,206 +398,203 @@
     </footer>
 
     <script>
-        // ================= 广告拦截核心代码 =================
-        // 增强的广告关键词列表
-        const adKeywords = [
-            'ad.', 'ads.', 'ad\\', 'ad/', 'ad-', 'ad_', 'doubleclick', 'adserver', 
-            'advert', 'advertising', 'adcontent', 'adimage', 'preroll', 'midroll', 
-            'postroll', 'ad_cdn', 'adg', 'adx', 'adsys', 'adserv', 'adsystem', 
-            'advertise', 'advertisement', 'advertiser', 'advertising', 'advertize', 
-            'advertizing', 'adwrapper', 'bannerad', 'basead', 'adworld', 'adzone', 
-            'billboardad', 'clickad', 'commercial', 'dynamicad', 'googlead', 'iad', 
-            'inlinead', 'pagead', 'popupad', 'sponsor', 'sponsored', 'sponsoredad', 
-            'sponsoredlink', 'sponsoredlinks', 'sponsoredresult', 'sponsoredresults', 
-            'textad', 'trackingad', 'video_ad', 'videoad', 'adsegment', 'adbreak',
-            'adinsert', 'adtag', 'adprovider', 'adtech', 'adnetwork', 'admanager',
-            'adroll', 'advertorial', 'promo', 'commercial', 'bumper', 'overlayad',
-            'companionad', 'adrequest', 'adresponse', 'adtiming', 'admetric', 'adlog'
-        ];
-
-        // 增强的图片广告扩展名
-        const imageExtensions = ['.jpg', '.png', '.jpeg', '.gif', '.webp', '.bmp'];
-
-        // 核心广告过滤函数
-        function filterM3U8Content(content) {
-            if (!content) return content;
-            
-            try {
-                const lines = content.split('\n');
-                let result = [];
-                let inAdBlock = false;
-                let adBlockLines = [];
-                let segmentCount = 0;
-                let totalDuration = 0;
-                let hasAdKeyword = false;
-                let hasAdImage = false;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-
-                    // 检查是否包含广告关键词
-                    if (line.match(/\.(ts|jpg|png|jpeg|gif|webp|bmp)$/i)) {
-                        const url = line.toLowerCase();
-                        const isImage = imageExtensions.some(ext => url.includes(ext));
-                        
-                        if (isImage) {
-                            hasAdImage = true;
-                        }
-                        
-                        if (adKeywords.some(kw => url.includes(kw))) {
-                            hasAdKeyword = true;
-                        }
-                    }
-
-                    // 检测广告块开始
-                    if (line.startsWith('#EXT-X-DISCONTINUITY') || 
-                        line.includes('#EXT-X-CUE-OUT') || 
-                        line.includes('#EXT-OATCLS-SCTE35')) {
-                        if (!inAdBlock) {
-                            inAdBlock = true;
-                            adBlockLines = [line];
-                            segmentCount = 0;
-                            totalDuration = 0;
-                            hasAdKeyword = false;
-                            hasAdImage = false;
-                        } else {
-                            adBlockLines.push(line);
-                        }
-                        continue;
-                    }
-
-                    // 处理广告块中的EXTINF行
-                    if (inAdBlock && line.startsWith('#EXTINF')) {
-                        adBlockLines.push(line);
-                        const durationMatch = line.match(/#EXTINF:([\d.]+),/);
-                        if (durationMatch) {
-                            totalDuration += parseFloat(durationMatch[1]);
-                        }
-                        continue;
-                    }
-
-                    // 处理广告块中的媒体行
-                    if (inAdBlock && line.match(/\.(ts|jpg|png|jpeg|gif|webp|bmp)$/i)) {
-                        adBlockLines.push(line);
-                        segmentCount++;
-                        continue;
-                    }
-
-                    // 广告块结束处理
-                    if (inAdBlock) {
-                        // 增强的广告检测条件
-                        const isAd = (totalDuration < 45 && segmentCount < 6) || 
-                                    hasAdKeyword || 
-                                    hasAdImage || 
-                                    (totalDuration > 0 && segmentCount === 0); // 只有标记没有片段
-                        
-                        if (!isAd) {
-                            result = result.concat(adBlockLines);
-                        } else {
-                            console.log(`[广告拦截] 移除广告块: ${segmentCount}个片段, 总时长${totalDuration}秒`);
-                        }
-                        
-                        inAdBlock = false;
-                        adBlockLines = [];
-                    }
-
-                    // 添加普通行
-                    result.push(lines[i]);
-                }
-
-                // 处理文件末尾的广告块
-                if (inAdBlock) {
-                    const isAd = (totalDuration < 45 && segmentCount < 6) || 
-                                hasAdKeyword || 
-                                hasAdImage;
-                    if (!isAd) {
-                        result = result.concat(adBlockLines);
-                    }
-                }
-
-                // 确保以#EXT-X-ENDLIST结束
-                if (result.length > 0 && !result[result.length - 1].includes('#EXT-X-ENDLIST')) {
-                    result.push('#EXT-X-ENDLIST');
-                }
-
-                return result.join('\n');
-            } catch (e) {
-                console.error('处理m3u8时出错:', e);
-                return content;
-            }
-        }
-
-        // 增强的HLS播放器封装
-        function setupAdFreeHlsPlayer(videoElement, url) {
+        // 优化的HLS播放器封装，增强预缓存能力
+        function setupOptimizedHlsPlayer(videoElement, url) {
             if (Hls.isSupported()) {
+                // 增强的HLS配置参数，提高预缓存能力
                 const hls = new Hls({
                     debug: false,
+                    maxBufferLength: 90,          // 增加最大缓冲长度到90秒
+                    maxMaxBufferLength: 300,       // 增加最大缓冲上限到300秒
+                    startLevel: -1,                // 自动选择适合带宽的起始级别
+                    maxBufferHole: 1.5,            // 增加最大缓冲空洞容忍度
+                    highLatencyMode: false,
+                    backBufferLength: 300,         // 增加回放后缓冲保留时间到300秒
                     enableWorker: true,
-                    backBufferLength: 90
-                });
-
-                // 拦截并处理m3u8清单
-                hls.on(Hls.Events.MANIFEST_LOADING, (event, data) => {
-                    const originalLoader = hls.loader;
-                    
-                    hls.loader = {
-                        load: function(context, config, callbacks) {
-                            if (context.type === 'manifest') {
-                                // 自定义加载器处理m3u8内容
-                                const onSuccess = callbacks.onSuccess;
-                                
-                                callbacks.onSuccess = (response, stats, context) => {
-                                    try {
-                                        const filteredContent = filterM3U8Content(response.data);
-                                        response.data = filteredContent;
-                                        onSuccess(response, stats, context);
-                                    } catch (e) {
-                                        console.error('处理m3u8失败:', e);
-                                        onSuccess(response, stats, context);
-                                    }
-                                };
-                            }
-                            originalLoader.load(context, config, callbacks);
-                        },
-                        abort: function() { originalLoader.abort(); },
-                        destroy: function() { originalLoader.destroy(); }
-                    };
+                    lowLatencyMode: false,
+                    // 增加并发请求数
+                    maxMaxBufferLength: 300,
+                    maxBufferLength: 90,
+                    // 预加载策略优化
+                    abrEwmaDefaultEstimate: 8000000, // 提高初始带宽估计值到8Mbps
+                    abrEwmaSlowLive: 9.0,          // 降低EWMA权重，使带宽估计更稳定
+                    abrEwmaFastLive: 4.0,
+                    // 片段加载超时设置
+                    fetchTimeOut: 20000,           // 增加超时时间到20秒
+                    fetchMaxRetry: 5,              // 增加重试次数到5次
+                    fetchRetryDelay: 1500,         // 增加重试延迟到1.5秒
+                    // 预加载策略
+                    preloadNextLevel: true,
+                    // 增加并发下载的片段数量
+                    maxMaxBufferLength: 300,
+                    maxBufferLength: 90,
+                    // 配置片段请求优先级
+                    startLevel: -1,
+                    // 自适应比特率算法调整
+                    abrBandWidthFactor: 0.8,       // 降低带宽因子，更早切换到高质量
+                    abrBandWidthUpFactor: 0.9,     // 提高带宽上升因子
+                    // 允许更大的初始缓冲
+                    startLevel: -1,
+                    // 强制预加载更多片段
+                    maxBufferLength: 90,
+                    maxMaxBufferLength: 300,
+                    // 启用分段并行下载
+                    maxMaxBufferLength: 300,
+                    maxBufferLength: 90,
+                    // 配置预加载窗口
+                    maxBufferLength: 90,
+                    maxMaxBufferLength: 300
                 });
 
                 // 加载视频源
                 hls.loadSource(url);
                 hls.attachMedia(videoElement);
+
+                // 显示缓冲指示器
+                const bufferIndicator = document.getElementById('bufferIndicator');
+                bufferIndicator.classList.remove('hidden');
                 
-                // 错误处理
+                // 更新缓冲进度指示器
+                function updateBufferIndicator() {
+                    if (videoElement.buffered.length > 0) {
+                        const bufferedEnd = videoElement.buffered.end(videoElement.buffered.length - 1);
+                        const duration = videoElement.duration || 0;
+                        const bufferedSeconds = Math.max(0, bufferedEnd - videoElement.currentTime);
+                        const bufferPercentage = duration ? Math.round((bufferedEnd / duration) * 100) : 0;
+                        
+                        bufferIndicator.textContent = `已缓存: ${bufferedSeconds.toFixed(0)}秒 (${bufferPercentage}%)`;
+                        
+                        // 根据缓冲状态调整显示样式
+                        if (bufferedSeconds < 10) {
+                            bufferIndicator.classList.add('bg-red-600');
+                            bufferIndicator.classList.remove('bg-yellow-600', 'bg-green-600');
+                        } else if (bufferedSeconds < 30) {
+                            bufferIndicator.classList.add('bg-yellow-600');
+                            bufferIndicator.classList.remove('bg-red-600', 'bg-green-600');
+                        } else {
+                            bufferIndicator.classList.add('bg-green-600');
+                            bufferIndicator.classList.remove('bg-red-600', 'bg-yellow-600');
+                        }
+                    }
+                    requestAnimationFrame(updateBufferIndicator);
+                }
+                
+                // 开始更新缓冲指示器
+                updateBufferIndicator();
+
+                // 错误处理与恢复机制
                 hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS错误:', data);
+                    bufferIndicator.textContent = `缓冲错误: ${data.type}`;
+                    bufferIndicator.classList.add('bg-red-600');
+                    
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.error('网络错误，尝试重新加载');
+                                console.log('网络错误，尝试重新加载...');
+                                bufferIndicator.textContent = '网络错误，重试中...';
                                 hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.error('媒体错误，尝试恢复');
+                                console.log('媒体错误，尝试恢复...');
+                                bufferIndicator.textContent = '媒体错误，恢复中...';
                                 hls.recoverMediaError();
                                 break;
                             default:
-                                console.error('无法恢复的错误');
+                                console.log('无法恢复的错误，尝试重新初始化播放器');
+                                bufferIndicator.textContent = '错误，重新加载...';
+                                // 销毁当前实例并尝试重新创建
+                                hls.destroy();
+                                setupOptimizedHlsPlayer(videoElement, url);
                                 break;
                         }
                     }
                 });
+
+                // 缓冲策略增强：主动预加载更多内容
+                let bufferCheckInterval;
                 
+                function startBufferCheck() {
+                    // 定期检查缓冲状态
+                    bufferCheckInterval = setInterval(() => {
+                        if (videoElement.buffered.length > 0 && !videoElement.paused) {
+                            const bufferedEnd = videoElement.buffered.end(videoElement.buffered.length - 1);
+                            const currentTime = videoElement.currentTime;
+                            const remainingBuffer = bufferedEnd - currentTime;
+                            const duration = videoElement.duration || 0;
+                            
+                            // 如果缓冲不足，降低清晰度
+                            if (remainingBuffer < 20 && hls.levels && hls.levels.length > 1) {
+                                const currentLevel = hls.currentLevel;
+                                if (currentLevel > 0) {
+                                    console.log(`缓冲不足(${remainingBuffer.toFixed(1)}s)，降低视频质量`);
+                                    hls.currentLevel = Math.max(0, currentLevel - 1);
+                                }
+                            } 
+                            // 如果缓冲充足且网络状况良好，提高清晰度
+                            else if (remainingBuffer > 60 && hls.levels && hls.levels.length > hls.currentLevel + 1) {
+                                console.log(`缓冲充足(${remainingBuffer.toFixed(1)}s)，提高视频质量`);
+                                hls.currentLevel = Math.min(hls.levels.length - 1, hls.currentLevel + 1);
+                            }
+                            
+                            // 如果接近视频末尾但还有缓冲空间，尝试预加载更多
+                            if (duration > 0 && currentTime / duration > 0.7 && remainingBuffer < 60) {
+                                console.log('接近视频末尾，尝试预加载更多内容');
+                                hls.startLoad();
+                            }
+                        }
+                    }, 3000); // 每3秒检查一次
+                }
+                
+                // 当视频开始播放时启动缓冲检查
+                videoElement.addEventListener('play', startBufferCheck);
+                
+                // 当视频暂停时停止缓冲检查
+                videoElement.addEventListener('pause', () => {
+                    if (bufferCheckInterval) {
+                        clearInterval(bufferCheckInterval);
+                    }
+                });
+
+                // 当视频结束时清理
+                videoElement.addEventListener('ended', () => {
+                    if (bufferCheckInterval) {
+                        clearInterval(bufferCheckInterval);
+                    }
+                    bufferIndicator.classList.add('hidden');
+                });
+
                 return hls;
             } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
                 // Safari原生支持
                 videoElement.src = url;
+                // 增加预加载
+                videoElement.preload = 'auto';
+                
+                // 显示缓冲指示器
+                const bufferIndicator = document.getElementById('bufferIndicator');
+                bufferIndicator.classList.remove('hidden');
+                
+                // 更新缓冲进度
+                function updateBufferIndicator() {
+                    if (videoElement.buffered.length > 0) {
+                        const bufferedEnd = videoElement.buffered.end(videoElement.buffered.length - 1);
+                        const duration = videoElement.duration || 0;
+                        const bufferedSeconds = Math.max(0, bufferedEnd - videoElement.currentTime);
+                        const bufferPercentage = duration ? Math.round((bufferedEnd / duration) * 100) : 0;
+                        
+                        bufferIndicator.textContent = `已缓存: ${bufferedSeconds.toFixed(0)}秒 (${bufferPercentage}%)`;
+                    }
+                    requestAnimationFrame(updateBufferIndicator);
+                }
+                
+                updateBufferIndicator();
                 return null;
             } else {
                 console.error('HLS不受支持');
                 return null;
             }
         }
-        // ================= 广告拦截核心代码结束 =================
 
         document.addEventListener('DOMContentLoaded', function() {
             const videoUrl = document.getElementById('videoUrl');
@@ -592,28 +602,36 @@
             const videoPlayer = document.getElementById('videoPlayer');
             const m3u8Player = document.getElementById('m3u8Player');
             const loadingIndicator = document.getElementById('loadingIndicator');
-            const fullscreenBtn = document.getElementById('fullscreenBtn');
             const currentApi = document.getElementById('currentApi');
             const clearInput = document.getElementById('clearInput');
             const playerPlaceholder = document.getElementById('playerPlaceholder');
+            const playerSection = document.getElementById('playerSection');
+            const mainHeader = document.getElementById('mainHeader');
+            const bufferIndicator = document.getElementById('bufferIndicator');
             
+            // 监听滚动事件，控制顶部横幅显示
+            window.addEventListener('scroll', function() {
+                if (window.scrollY <= 10) { // 当滚动到顶部附近时显示
+                    mainHeader.classList.remove('-translate-y-full');
+                } else { // 滚动离开顶部时隐藏
+                    mainHeader.classList.add('-translate-y-full');
+                }
+            });
+            
+            // 初始检查一次滚动位置
+            if (window.scrollY <= 10) {
+                mainHeader.classList.remove('-translate-y-full');
+            }
+
             // 全局HLS播放器实例
             let hls = null;
-            
+
             // 清除输入框内容
             clearInput.addEventListener('click', function() {
                 videoUrl.value = '';
                 videoUrl.focus();
             });
-            
-            // 平台链接点击事件
-            const platformLinks = document.querySelectorAll('.platform-card');
-            platformLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    // 只保留跳转功能
-                });
-            });
-            
+
             // 播放按钮点击事件
             playBtn.addEventListener('click', function() {
                 const url = videoUrl.value.trim();
@@ -622,28 +640,50 @@
                     videoUrl.focus();
                     return;
                 }
-                
+
                 // 获取选中的解析接口
                 const selectedApi = document.querySelector('input[name="api"]:checked');
                 if (!selectedApi) {
                     alert('请选择解析接口');
                     return;
                 }
-                
+
                 // 更新当前使用的接口信息
                 const apiNames = {
-                    'api1': '默认线路', 'api2': '线路一', 'api3': '线路二', 'api4': '线路三',
-                    'api5': '线路四', 'api6': '线路五', 'api7': '线路六', 'api8': '线路七',
-                    'api9': '线路八', 'api10': '线路九', 'api11': '线路十', 'api12': '点播线路'
+                    'api1': '默认线路',
+                    'api2': '线路一',
+                    'api3': '线路二',
+                    'api4': '线路三',
+                    'api5': '线路四',
+                    'api6': '线路五',
+                    'api7': '线路六',
+                    'api8': '线路七',
+                    'api9': '线路八',
+                    'api10': '线路九',
+                    'api11': '线路十',
+                    'api12': '点播线路'
                 };
                 currentApi.textContent = `当前使用：${apiNames[selectedApi.id]}`;
-                
+
                 // 显示加载指示器
                 playerPlaceholder.classList.add('hidden');
                 videoPlayer.classList.add('hidden');
                 m3u8Player.classList.add('hidden');
                 loadingIndicator.classList.remove('hidden');
+                bufferIndicator.classList.add('hidden');
                 
+                // 添加高亮动画
+                playerSection.classList.add('player-highlight');
+                setTimeout(() => {
+                    playerSection.classList.remove('player-highlight');
+                }, 500);
+                
+                // 滚动到播放器位置，使其居中显示
+                playerSection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center'  // 垂直居中
+                });
+
                 // 特殊处理点播线路（m3u8）
                 if (selectedApi.id === 'api12') {
                     // 显示m3u8播放器
@@ -654,15 +694,17 @@
                                 hls.destroy();
                                 hls = null;
                             }
-                            
+
                             // 重置播放器
                             m3u8Player.pause();
                             m3u8Player.removeAttribute('src');
                             m3u8Player.load();
-                            
-                            // 使用带广告拦截的HLS播放器
-                            hls = setupAdFreeHlsPlayer(m3u8Player, url);
 
+                            // 提前预热播放器，开始预加载
+                            m3u8Player.preload = 'auto';
+                            
+                            // 使用优化的HLS播放器
+                            hls = setupOptimizedHlsPlayer(m3u8Player, url);
                             if (hls) {
                                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
                                     loadingIndicator.classList.add('hidden');
@@ -694,7 +736,7 @@
                 } else {
                     // 构建解析URL
                     const parseUrl = selectedApi.value + encodeURIComponent(url);
-                    
+
                     // 设置iframe源并显示视频
                     setTimeout(() => {
                         try {
@@ -702,6 +744,7 @@
                             videoPlayer.onload = function() {
                                 loadingIndicator.classList.add('hidden');
                                 videoPlayer.classList.remove('hidden');
+                                bufferIndicator.classList.add('hidden');
                             };
                             videoPlayer.onerror = function() {
                                 loadingIndicator.classList.add('hidden');
@@ -715,35 +758,14 @@
                     }, 500);
                 }
             });
-            
-            // 全屏按钮点击事件
-            fullscreenBtn.addEventListener('click', function() {
-                let targetElement;
-                
-                if (!videoPlayer.classList.contains('hidden')) {
-                    targetElement = videoPlayer;
-                } else if (!m3u8Player.classList.contains('hidden')) {
-                    targetElement = m3u8Player;
-                } else {
-                    return;
-                }
-                
-                if (targetElement.requestFullscreen) {
-                    targetElement.requestFullscreen();
-                } else if (targetElement.webkitRequestFullscreen) {
-                    targetElement.webkitRequestFullscreen();
-                } else if (targetElement.msRequestFullscreen) {
-                    targetElement.msRequestFullscreen();
-                }
-            });
-            
+
             // 输入框回车事件
             videoUrl.addEventListener('keyup', function(event) {
                 if (event.key === 'Enter') {
                     playBtn.click();
                 }
             });
-            
+
             // 当选择点播线路时，更改输入框提示
             const apiRadios = document.querySelectorAll('input[name="api"]');
             apiRadios.forEach(radio => {
@@ -761,12 +783,12 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const urlParam = urlParams.get('url');
                 const autoParam = urlParams.get('auto');
-                
+
                 if (urlParam) {
                     // 解码URL参数并填充到输入框
                     const decodedUrl = decodeURIComponent(urlParam);
                     videoUrl.value = decodedUrl;
-                    
+
                     // 如果存在auto参数且值为true/1/yes，则自动播放
                     if (autoParam && ['true', '1', 'yes'].includes(autoParam.toLowerCase())) {
                         setTimeout(() => {
@@ -775,7 +797,7 @@
                     }
                 }
             }
-            
+
             // 页面加载完成后检查URL参数
             checkUrlParams();
         });
